@@ -1,0 +1,32 @@
+apiVersion: serving.knative.dev/v1alpha1
+kind: Service
+metadata:
+  name: explicit-content-detector
+  labels:
+    contrib.eventing.knative.dev/release: devel
+spec:
+  runLatest:
+    configuration:
+      revisionTemplate:
+        spec:
+          container:
+            image: github.com/akashrv/knative-samples/cmd/image-processing/explicit-content-detector
+            env:
+            - name: GOOGLE_APPLICATION_CREDENTIALS
+              value: /var/secrets/google/key.json
+            - name: GO111MODULE
+              value: 'on'
+            volumeMounts:
+            - name: google-cloud-key
+              mountPath: /var/secrets/google
+            resources:
+              limits:
+                cpu: 100m
+                memory: 30Mi
+              requests:
+                cpu: 20m
+                memory: 20Mi
+          volumes:
+          - name: google-cloud-key
+            secret:
+              secretName: google-cloud-key
