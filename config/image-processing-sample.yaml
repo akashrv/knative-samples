@@ -61,7 +61,7 @@ spec:
             - name: GO111MODULE
               value: 'on'
             - name: QUARANTINE_BUCKET_ID
-              value: akashv-bucket-2
+              value: <quarantinebucket>
             volumeMounts:
             - name: google-cloud-key
               mountPath: /var/secrets/google
@@ -122,7 +122,7 @@ kind: Storage
 metadata:
   name: exp-content-detector
 spec:
-  bucket: akashv-bucket-1
+  bucket: <quarantinebucket>
   ceOverrides:
     extensions:
       # Custom attribute that will be added to each cloud event 

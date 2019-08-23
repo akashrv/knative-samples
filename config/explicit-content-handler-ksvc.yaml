@@ -17,7 +17,7 @@ spec:
             - name: GO111MODULE
               value: 'on'
             - name: QUARANTINE_BUCKET_ID
-              value: akashv-bucket
+              value: <quarantinebucket>
             volumeMounts:
             - name: google-cloud-key
               mountPath: /var/secrets/google
