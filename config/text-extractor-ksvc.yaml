@@ -1,7 +1,7 @@
 apiVersion: serving.knative.dev/v1alpha1
 kind: Service
 metadata:
-  name: explicit-content-detector
+  name: text-extractor
   labels:
     contrib.eventing.knative.dev/release: devel
 spec:
@@ -10,7 +10,7 @@ spec:
       revisionTemplate:
         spec:
           container:
-            image: github.com/akashrv/knative-samples/cmd/image-processing/explicit-content-detector
+            image: github.com/akashrv/knative-samples/cmd/image-processing/text-extractor
             env:
             - name: GOOGLE_APPLICATION_CREDENTIALS
               value: /var/secrets/google/key.json

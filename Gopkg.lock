@@ -2,12 +2,18 @@
 
 
 [[projects]]
-  digest = "1:28e11438bca0e19add464ad6ee6e199dc6afb0aa06f6146ff2bdc1231c3d3d7e"
+  digest = "1:ba8dd5e136fa605d5b1db61e7df0663d97797b48b1b16e315813aa9644fb81ab"
   name = "cloud.google.com/go"
   packages = [
     "compute/metadata",
+    "iam",
+    "internal",
+    "internal/optional",
+    "internal/trace",
+    "internal/version",
     "longrunning",
     "longrunning/autogen",
+    "storage",
     "vision/apiv1",
   ]
   pruneopts = "UT"
@@ -197,13 +203,17 @@
   version = "v0.3.2"
 
 [[projects]]
-  digest = "1:1456050675c5a5b880afccc4e274002fda71a019acdf7806e8c78b0238d70054"
+  digest = "1:4ab49bfbcb7adb7a5afb3ee1756e2e3a1feb6c552e6bd4059e76f186eafa5bc0"
   name = "google.golang.org/api"
   packages = [
+    "gensupport",
+    "googleapi",
+    "googleapi/internal/uritemplates",
     "googleapi/transport",
     "internal",
     "iterator",
     "option",
+    "storage/v1",
     "transport",
     "transport/grpc",
     "transport/http",
@@ -236,14 +246,17 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:359457a82c062ad726b2d727f95c36484fa3750989615453d1663de2bf21c83d"
+  digest = "1:711b75ae1d14b33fb0458b1c3b0b6a03d5f2c119fa70014bff4396f3184310aa"
   name = "google.golang.org/genproto"
   packages = [
     "googleapis/api/annotations",
     "googleapis/cloud/vision/v1",
+    "googleapis/iam/v1",
     "googleapis/longrunning",
+    "googleapis/rpc/code",
     "googleapis/rpc/status",
     "googleapis/type/color",
+    "googleapis/type/expr",
     "googleapis/type/latlng",
     "protobuf/field_mask",
   ]
@@ -307,8 +320,12 @@
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
+    "cloud.google.com/go/storage",
     "cloud.google.com/go/vision/apiv1",
     "github.com/cloudevents/sdk-go",
+    "github.com/google/uuid",
+    "google.golang.org/api/storage/v1",
+    "google.golang.org/genproto/googleapis/cloud/vision/v1",
   ]
   solver-name = "gps-cdcl"
   solver-version = 1

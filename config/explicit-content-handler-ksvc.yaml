@@ -1,7 +1,7 @@
 apiVersion: serving.knative.dev/v1alpha1
 kind: Service
 metadata:
-  name: explicit-content-detector
+  name: explicit-content-handler
   labels:
     contrib.eventing.knative.dev/release: devel
 spec:
@@ -10,12 +10,14 @@ spec:
       revisionTemplate:
         spec:
           container:
-            image: github.com/akashrv/knative-samples/cmd/image-processing/explicit-content-detector
+            image: github.com/akashrv/knative-samples/cmd/image-processing/explicit-content-handler
             env:
             - name: GOOGLE_APPLICATION_CREDENTIALS
               value: /var/secrets/google/key.json
             - name: GO111MODULE
               value: 'on'
+            - name: QUARANTINE_BUCKET_ID
+              value: akashv-bucket
             volumeMounts:
             - name: google-cloud-key
               mountPath: /var/secrets/google
