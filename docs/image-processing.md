@@ -1,7 +1,7 @@
 # Image processing using [Knative Eventing](https://github.com/knative/eventing/), [Cloud Run on GKE](https://cloud.google.com/run/) and [Google Cloud Vision API](https://cloud.google.com/vision/docs/)
 
-# Architecture diagram
-![Architecture diagram](image-processing-arch.png)
+## Component diagram
+![Component diagram](image-processing-arch.png)
 
 - User uploads an image to a GCS bucket
 - <u>cmd/explicit-content-detector</u> is triggered when a new file get uploaded. It uses Cloud Vision APIs to detect if the image has [explicit content (adult, spoof, medical, violence, racy)](https://cloud.google.com/vision/docs/reference/rpc/google.cloud.vision.v1#google.cloud.vision.v1.SafeSearchAnnotation)
@@ -9,8 +9,8 @@ It then creates a new event (pkg/eventsschema/fileuploaded) with a customExtensi
 - <u>cmd/explicit-content-handler</u> gets triggered on this new event if customExtension:explicit-content. It will quarantine the image (move it to another bucket)
 - <u>cmd/no-explicit-content</u> gets triggered on this new event if customExtension:no-explicit-content. It will extract text from the image, if present, using Cloud Vision API and create a new file in the original GCS bucket with the extracted text.
 
-# Pre-reqs
-## Google Cloud Setup
+## Pre-reqs
+### Google Cloud Setup
 1. If you haven’t already done so, [install the Google Cloud SDK](https://cloud.google.com/sdk/docs/) and authenticate with gcloud auth login.
 2. Create a new GCP project with a billing account (we do not recommend using an existing project. Creating a new project maintains separation from existing deployments).
 3. If you don’t already have it, install kubectl with the command 
@@ -18,7 +18,7 @@ It then creates a new event (pkg/eventsschema/fileuploaded) with a customExtensi
 gcloud components install kubectl.
 ```
 
-## Create a GKE cluster with Cloud Run addon
+### Create a GKE cluster with Cloud Run addon
 Follow the [Setup Guide](https://cloud.google.com/run/docs/gke/setup) for Cloud Run on GKE to create a cluster. Note: Please ensure the CloudRun addon is enabled during cluster creation.
 ```
 gcloud beta container clusters create CLUSTER_NAME \
@@ -34,7 +34,7 @@ gcloud services enable container.googleapis.com containerregistry.googleapis.com
 Replace CLUSTER_NAME with the name you used for your cluster, and if necessary replace us-central1-a with the supported cluster location of your choice.
 > **Important**: Running a GKE configuration like the one described in this page can be costly. GKE is billed differently than Cloud Run, so you will be billed for each node in your cluster, even if you have no services deployed to them. To avoid charges, you should delete your cluster or scale the number of the nodes in the cluster to zero if you are not using it.
 
-## Install Eventing
+### Install Eventing
 1. Install the core eventing components
 Note: Do not use the instructions from knative.dev to install eventing. The steps listed here install alternate versions and additional components.
 ```
@@ -51,7 +51,7 @@ kubectl apply --selector events.cloud.run/crd-install=true -f  https://storage.g
 kubectl apply -f https://storage.googleapis.com/knative-nightly/knative-gcp/previous/v20190821-5e7ccc5/cloud-run-events.yaml 
 ```
 
-# Build and deploy application
+## Build and deploy application
 
 1. Create a new namespace on the cluster so that clean-up is easy. Label it to enable eventing.
 ```
@@ -125,7 +125,7 @@ gcloud services enable vision.googleapis.com
     ```
     ko apply -f config/image-processing-sample.yaml
     ```
-# Test
+## Test
 We will use the files present in tesdata. There are spoofed and original version of images. Vision APIs will detect spoofed image.
 Open three bash shell windows and start capturing pod logs using any tool. In this example we will use [stern](https://github.com/wercker/stern)
 ```
@@ -137,7 +137,7 @@ stern -l serving.knative.dev/configuration=text-extractor -c user-container
 ```
 
 
-## Test explicit content flow
+### Test explicit content flow
 1. Upload the testdata/silky-spoofed.jpg to the sourcebucket
     ```
     gsutil cp testdata/silky-spoofed.jpg gs://<sourcebucketid>
@@ -146,7 +146,7 @@ stern -l serving.knative.dev/configuration=text-extractor -c user-container
 
 3. See pod logs for some more details.
 
-## Test non-explicit or safe content flow
+### Test non-explicit or safe content flow
 1. Upload the testdata/silky-spoofed.jpg to the sourcebucket
     ```
     gsutil cp testdata/silky-not-spoofed.jpg gs://<sourcebucketid>
@@ -155,7 +155,7 @@ stern -l serving.knative.dev/configuration=text-extractor -c user-container
 
 3. See pod logs for some more details.
 
-# Clean-up
+## Clean-up
 1. Delete the kubernetes namespace or delete the GKE cluster
 ```
 kubectl delete ns image-processing
@@ -174,6 +174,6 @@ gcloud iam service-accounts delete cloudrunevents-pullsub
 ```
 4. Delete the downloaded json key
 
-# Troubleshooting
+## Troubleshooting
 to do
 
