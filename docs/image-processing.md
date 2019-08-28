@@ -48,7 +48,7 @@ kubectl apply -f https://storage.googleapis.com/knative-nightly/eventing/previou
 ```
 kubectl apply --selector events.cloud.run/crd-install=true -f  https://storage.googleapis.com/knative-nightly/knative-gcp/previous/v20190821-5e7ccc5/cloud-run-events.yaml
 
-kubectl apply -f  https://storage.googleapis.com/knative-nightly/knative-gcp/previous/v20190821-5e7ccc5/cloud-run-events.yaml 
+kubectl apply -f https://storage.googleapis.com/knative-nightly/knative-gcp/previous/v20190821-5e7ccc5/cloud-run-events.yaml 
 ```
 
 # Build and deploy application
@@ -144,7 +144,7 @@ stern -l serving.knative.dev/configuration=text-extractor -c user-container
     ```
 2. Go to [Cloud Console UI](https://console.cloud.google.com) and browse the source as well as quarantine bucket. If the setup was correct then you should see silky-spoofed.jpg appear in quarantine bucket and gets deleted from source bucket.
 
-3. See pod logs for some mroe details.
+3. See pod logs for some more details.
 
 ## Test non-explicit or safe content flow
 1. Upload the testdata/silky-spoofed.jpg to the sourcebucket
@@ -153,7 +153,7 @@ stern -l serving.knative.dev/configuration=text-extractor -c user-container
     ```
 2. Go to [Cloud Console UI](https://console.cloud.google.com) and browse the source as well as quarantine bucket. If the setup was correct then you should see silky-not-spoofed.jpg in the source bucket along with a new file silky-not-spoofed.jpg.txt. Open the image as well as the text file and see if the text matches.
 
-3. See pod logs for some mroe details.
+3. See pod logs for some more details.
 
 # Clean-up
 1. Delete the kubernetes namespace or delete the GKE cluster
@@ -172,7 +172,7 @@ gsutil rb gs://<bucketId>
 ```
 gcloud iam service-accounts delete cloudrunevents-pullsub
 ```
-4. Delete the downloaded .json key
+4. Delete the downloaded json key
 
 # Troubleshooting
 to do
