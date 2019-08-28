@@ -1,0 +1,200 @@
+# Cloud Run service that will be triggered by the GCS finalize event
+# when a file is uploaded to a bucket
+# Uses Google Cloud Vision APIs
+apiVersion: serving.knative.dev/v1alpha1
+kind: Service
+metadata:
+  name: explicit-content-detector
+  labels:
+    contrib.eventing.knative.dev/release: devel
+spec:
+  runLatest:
+    configuration:
+      revisionTemplate:
+        spec:
+          container:
+            image: github.com/akashrv/knative-samples/cmd/image-processing/explicit-content-detector
+            env:
+            - name: GOOGLE_APPLICATION_CREDENTIALS
+              value: /var/secrets/google/key.json
+            - name: GO111MODULE
+              value: 'on'
+            volumeMounts:
+            - name: google-cloud-key
+              mountPath: /var/secrets/google
+            resources:
+              limits:
+                cpu: 100m
+                memory: 30Mi
+              requests:
+                cpu: 20m
+                memory: 20Mi
+          volumes:
+          - name: google-cloud-key
+            secret:
+              secretName: google-cloud-key
+---
+# Cloud Run service that gets triggered when explicit content is detected
+# in the image uploaded to the storage bucket.
+apiVersion: serving.knative.dev/v1alpha1
+kind: Service
+metadata:
+  name: explicit-content-handler
+  labels:
+    contrib.eventing.knative.dev/release: devel
+spec:
+  runLatest:
+    configuration:
+      revisionTemplate:
+        spec:
+          container:
+            image: github.com/akashrv/knative-samples/cmd/image-processing/explicit-content-handler
+            env:
+            - name: GOOGLE_APPLICATION_CREDENTIALS
+              value: /var/secrets/google/key.json
+            - name: GO111MODULE
+              value: 'on'
+            - name: QUARANTINE_BUCKET_ID
+              value: quarantinebucket
+            volumeMounts:
+            - name: google-cloud-key
+              mountPath: /var/secrets/google
+            resources:
+              limits:
+                cpu: 100m
+                memory: 30Mi
+              requests:
+                cpu: 20m
+                memory: 20Mi
+          volumes:
+          - name: google-cloud-key
+            secret:
+              secretName: google-cloud-key
+---
+# Cloud Run service that gets triggered when the image is safe to 
+# process. It extracts text from the image and creates a new file
+# in the same bucket with name: <imagefilename>.txt
+# Uses Google Cloud Vision APIs
+apiVersion: serving.knative.dev/v1alpha1
+kind: Service
+metadata:
+  name: text-extractor
+  labels:
+    contrib.eventing.knative.dev/release: devel
+spec:
+  runLatest:
+    configuration:
+      revisionTemplate:
+        spec:
+          container:
+            image: github.com/akashrv/knative-samples/cmd/image-processing/text-extractor
+            env:
+            - name: GOOGLE_APPLICATION_CREDENTIALS
+              value: /var/secrets/google/key.json
+            - name: GO111MODULE
+              value: 'on'
+            volumeMounts:
+            - name: google-cloud-key
+              mountPath: /var/secrets/google
+            resources:
+              limits:
+                cpu: 100m
+                memory: 30Mi
+              requests:
+                cpu: 20m
+                memory: 20Mi
+          volumes:
+          - name: google-cloud-key
+            secret:
+              secretName: google-cloud-key
+---
+# Storage importer that imports finalize event from the cloud storage
+# bucket into the cluster and creates corresponding cloud event.
+# Replace quarantinebucket with the bucket id where the image files will be uploaded.
+apiVersion: events.cloud.run/v1alpha1
+kind: Storage
+metadata:
+  name: exp-content-detector
+spec:
+  bucket: sourcebucket
+  ceOverrides:
+    extensions:
+      # Custom attribute that will be added to each cloud event 
+      # that this importer produces. It is used later as a filter
+      # in Trigger. This is optional and is useful when there are 
+      # more than one importers importing the same source event.
+      knimportertrigger: MyUniqueImporterExtension
+  eventTypes:
+  - finalize
+  gcsSecret:
+    key: key.json
+    name: google-cloud-key
+  sink:
+    apiVersion: eventing.knative.dev/v1alpha1
+    kind: Broker
+    name: default
+---
+# Trigger that triggers explicit-content-detector Cloud Run service
+# when the storage importer produces a "google.storage.object.finalize"
+# cloud event.
+apiVersion: eventing.knative.dev/v1alpha1
+kind: Trigger
+metadata:
+  name: exp-content-detector
+spec:
+  broker: default
+  filter:
+    attributes:
+      type: google.storage.object.finalize
+      # This is the custom attribute that is added to the storage 
+      # importer spec. It is optional and is useful when there are 
+      # more than one importers importing the same source event.
+      knimportertrigger: MyUniqueImporterExtension
+  subscriber:
+    ref:
+      apiVersion: serving.knative.dev/v1alpha1
+      kind: Service
+      name: explicit-content-detector
+---
+# Trigger that triggers the explicit-content-handler Cloud Run service
+# when explicit content is detected by explicit-conten-detector service
+# The above two services are loosely coupled using the cloud event that 
+# matches the attributes specified in the filter below
+apiVersion: eventing.knative.dev/v1alpha1
+kind: Trigger
+metadata:
+  name: exp-content-handler
+spec:
+  broker: default
+  filter:
+    attributes:
+      type: custom.fileuploaded
+      source: custom.explicit-content-detector
+      customextension: explicit-content
+  subscriber:
+    ref:
+      apiVersion: serving.knative.dev/v1alpha1
+      kind: Service
+      name: explicit-content-handler
+---
+# Trigger that triggers the text-extractor Cloud Run service
+# when image content is safe as suggested by explicit-conten-detector service
+# The above two services are loosely coupled using the cloud event that 
+# matches the attributes specified in the filter below
+apiVersion: eventing.knative.dev/v1alpha1
+kind: Trigger
+metadata:
+  name: text-extractor
+spec:
+  broker: default
+  filter:
+    attributes:
+      type: custom.fileuploaded
+      source: custom.explicit-content-detector
+      customextension: no-explicit-content
+  subscriber:
+    ref:
+      apiVersion: serving.knative.dev/v1alpha1
+      kind: Service
+      name: text-extractor
+---
