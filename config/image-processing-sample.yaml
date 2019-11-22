@@ -111,10 +111,10 @@ spec:
 # Storage importer that imports finalize event from the cloud storage
 # bucket into the cluster and creates corresponding cloud event.
 # Replace quarantinebucket with the bucket id where the image files will be uploaded.
-apiVersion: events.cloud.run/v1alpha1
+apiVersion: events.cloud.google.com/v1alpha1
 kind: Storage
 metadata:
-  name: exp-content-detector
+  name: image-processing-source
 spec:
   bucket: sourcebucket
   ceOverrides:
@@ -125,14 +125,12 @@ spec:
       # more than one importers importing the same source event.
       knimportertrigger: MyUniqueImporterExtension
   eventTypes:
-  - finalize
-  gcsSecret:
-    key: key.json
-    name: google-cloud-key
+  - com.google.cloud.storage.object.finalize
   sink:
-    apiVersion: eventing.knative.dev/v1alpha1
-    kind: Broker
-    name: default
+    ref:
+      apiVersion: eventing.knative.dev/v1alpha1
+      kind: Broker
+      name: default
 ---
 # Trigger that triggers explicit-content-detector Cloud Run service
 # when the storage importer produces a "google.storage.object.finalize"
@@ -145,7 +143,7 @@ spec:
   broker: default
   filter:
     attributes:
-      type: google.storage.object.finalize
+      type: com.google.cloud.storage.object.finalize
       # This is the custom attribute that is added to the storage 
       # importer spec. It is optional and is useful when there are 
       # more than one importers importing the same source event.

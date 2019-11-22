@@ -18,7 +18,7 @@ import (
 )
 
 var (
-	finalizeEventType = "google.storage.object.finalize"
+	finalizeEventType = "com.google.cloud.storage.object.finalize"
 )
 
 func receive(ctx context.Context, event cloudevents.Event, response *cloudevents.EventResponse) error {

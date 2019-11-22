@@ -26,7 +26,7 @@ gcloud beta container clusters create CLUSTER_NAME \
 --machine-type=n1-standard-4 \
 --cluster-version=latest --zone=ZONE \
 --enable-stackdriver-kubernetes \
---scopes cloud-platform
+--scopes=cloud-platform,logging-write,monitoring-write,pubsub
 
 gcloud services enable container.googleapis.com containerregistry.googleapis.com cloudbuild.googleapis.com
 
@@ -36,19 +36,18 @@ Replace CLUSTER_NAME with the name you used for your cluster, and if necessary r
 
 ### Install Eventing
 1. Install the core eventing components
-Note: Do not use the instructions from knative.dev to install eventing. The steps listed here install alternate versions and additional components.
 ```
-kubectl apply --selector knative.dev/crd-install=true -f https://storage.googleapis.com/knative-nightly/eventing/previous/v20190819-2e28dc78/release.yaml
+kubectl apply --selector knative.dev/crd-install=true -f https://github.com/knative/eventing/releases/download/v0.10.1/release.yaml
 
-kubectl apply -f https://storage.googleapis.com/knative-nightly/eventing/previous/v20190819-2e28dc78/release.yaml 
+kubectl apply -f https://github.com/knative/eventing/releases/download/v0.10.1/release.yaml
 ```
 
 2. Install the GCP eventing components.
 
 ```
-kubectl apply --selector events.cloud.run/crd-install=true -f  https://storage.googleapis.com/knative-nightly/knative-gcp/previous/v20190821-5e7ccc5/cloud-run-events.yaml
+kubectl apply --selector events.cloud.google.com/crd-install=true -f  https://github.com/google/knative-gcp/releases/download/v0.10.1/cloud-run-events.yaml
 
-kubectl apply -f https://storage.googleapis.com/knative-nightly/knative-gcp/previous/v20190821-5e7ccc5/cloud-run-events.yaml 
+kubectl apply -f https://github.com/google/knative-gcp/releases/download/v0.10.1/cloud-run-events.yaml
 ```
 
 ## Build and deploy application
@@ -59,7 +58,7 @@ kubectl create ns image-processing
 
 kubectl label ns image-processing knative-eventing-injection=enabled
 
-#(optional) set the namespace as the default namespace for kubectl command
+# set the namespace as the default namespace for kubectl command
 kubectl config set-context $(kubectl config current-context) --namespace=image-processing
 ```
 2. Make sure the borker is Ready.
@@ -149,7 +148,7 @@ stern -l serving.knative.dev/configuration=text-extractor -c user-container
 ### Test non-explicit or safe content flow
 1. Upload the testdata/silky-spoofed.jpg to the sourcebucket
     ```
-    gsutil cp testdata/silky-not-spoofed.jpg gs://<sourcebucketid>
+    gsutil cp testdata/silky-not-spoofed.jpg gs://$BUCKET
     ```
 2. Go to [Cloud Console UI](https://console.cloud.google.com) and browse the source as well as quarantine bucket. If the setup was correct then you should see silky-not-spoofed.jpg in the source bucket along with a new file silky-not-spoofed.jpg.txt. Open the image as well as the text file and see if the text matches.
 
