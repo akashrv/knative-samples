@@ -139,7 +139,7 @@ stern -l serving.knative.dev/configuration=text-extractor -c user-container
 ### Test explicit content flow
 1. Upload the testdata/silky-spoofed.jpg to the sourcebucket
     ```
-    gsutil cp testdata/silky-spoofed.jpg gs://<sourcebucketid>
+    gsutil cp testdata/silky-spoofed.jpg gs://$BUCKET
     ```
 2. Go to [Cloud Console UI](https://console.cloud.google.com) and browse the source as well as quarantine bucket. If the setup was correct then you should see silky-spoofed.jpg appear in quarantine bucket and gets deleted from source bucket.
 

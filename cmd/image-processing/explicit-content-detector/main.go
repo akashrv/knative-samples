@@ -8,13 +8,12 @@ import (
 	"github.com/akashrv/knative-samples/pkg/eventsschema"
 
 	// To do move to zap logger
-	"log"
-
 	visionapi "cloud.google.com/go/vision/apiv1"
 	cloudevents "github.com/cloudevents/sdk-go"
 	"github.com/google/uuid"
 	"google.golang.org/api/storage/v1"
 	visionproto "google.golang.org/genproto/googleapis/cloud/vision/v1"
+	"log"
 )
 
 var (
@@ -26,11 +25,12 @@ func receive(ctx context.Context, event cloudevents.Event, response *cloudevents
 		response.Error(status, err.Error())
 		log.Println("Error occured:", err.Error())
 	} else {
-		fileUploadedEvent := cloudevents.NewEvent()
+		//fileUploadedEvent := cloudevents.NewEvent(cloudevents.VersionV1)
+		fileUploadedEvent := cloudevents.NewEvent(cloudevents.VersionV03)
 		fileUploadedEvent.Context.SetID(uuid.New().String())
 		fileUploadedEvent.Context.SetSource("custom.explicit-content-detector")
-		fileUploadedEvent.Context.SetSpecVersion(cloudevents.VersionV03)
 		fileUploadedEvent.Context.SetType("custom.fileuploaded")
+		fileUploadedEvent.Context.SetDataContentType(cloudevents.ApplicationJSON)
 		if fileUploadedEventData.ExplicitContent {
 			fileUploadedEvent.Context.SetExtension("customextension", "explicit-content")
 		} else {
@@ -76,7 +76,6 @@ func processEvent(ctx context.Context, event cloudevents.Event) (*eventsschema.F
 }
 
 func isContentExplicit(ctx context.Context, objectURI string) (bool, error) {
-
 	client, err := visionapi.NewImageAnnotatorClient(ctx)
 	if err != nil {
 		return false, fmt.Errorf("Failed to create client: %v", err)

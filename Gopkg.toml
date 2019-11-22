@@ -25,9 +25,9 @@
 #   unused-packages = true
 
 
-[[constraint]]
+[[override]]
   name = "github.com/cloudevents/sdk-go"
-  version = "0.8.0"
+  version = "0.10.0"
 
 [prune]
   go-tests = true
