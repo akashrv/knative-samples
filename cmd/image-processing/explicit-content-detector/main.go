@@ -21,12 +21,14 @@ var (
 )
 
 func receive(ctx context.Context, event cloudevents.Event, response *cloudevents.EventResponse) error {
+	log.Printf("Received event %v", event)
 	if fileUploadedEventData, status, err := processEvent(ctx, event); err != nil {
 		response.Error(status, err.Error())
 		log.Println("Error occured:", err.Error())
 	} else {
-		//fileUploadedEvent := cloudevents.NewEvent(cloudevents.VersionV1)
-		fileUploadedEvent := cloudevents.NewEvent(cloudevents.VersionV03)
+		//fileUploadedEvent := cloudevents.NewEvent(event.SpecVersion())
+		// fileUploadedEvent := cloudevents.NewEvent(cloudevents.VersionV03)
+		fileUploadedEvent := cloudevents.NewEvent(cloudevents.VersionV1)
 		fileUploadedEvent.Context.SetID(uuid.New().String())
 		fileUploadedEvent.Context.SetSource("custom.explicit-content-detector")
 		fileUploadedEvent.Context.SetType("custom.fileuploaded")
@@ -45,6 +47,7 @@ func receive(ctx context.Context, event cloudevents.Event, response *cloudevents
 }
 
 func processEvent(ctx context.Context, event cloudevents.Event) (*eventsschema.FileUploaded, int, error) {
+
 	// do something with event.Context and event.Data (via event.DataAs(foo)
 	if event.Context == nil {
 		return nil, http.StatusBadRequest, fmt.Errorf("event.Context is nil. cloudevents.Event\n%s", event.String())

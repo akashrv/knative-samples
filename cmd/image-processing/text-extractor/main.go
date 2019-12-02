@@ -33,7 +33,7 @@ func processEvent(ctx context.Context, event cloudevents.Event) (int, error) {
 	if event.Context.GetType() != eventType {
 		return http.StatusBadRequest, fmt.Errorf("invalid event type %s. Supported event type: %s", event.Context.GetType(), eventType)
 	}
-
+	log.Printf("Received event %v", event)
 	data := eventsschema.FileUploaded{}
 	err := event.DataAs(&data)
 
