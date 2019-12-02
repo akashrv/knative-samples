@@ -57,7 +57,7 @@ func (ec EventContextV01) ExtensionAs(name string, obj interface{}) error {
 			return fmt.Errorf("invalid type for extension %q", name)
 		}
 	default:
-		return fmt.Errorf("unkown extension type %T", obj)
+		return fmt.Errorf("unknown extension type %T", obj)
 	}
 }
 
@@ -115,8 +115,12 @@ func (ec EventContextV01) AsV02() *EventContextV02 {
 
 // AsV03 implements EventContextConverter.AsV03
 func (ec EventContextV01) AsV03() *EventContextV03 {
-	ecv2 := ec.AsV02()
-	return ecv2.AsV03()
+	return ec.AsV02().AsV03()
+}
+
+// AsV1 implements EventContextConverter.AsV1
+func (ec EventContextV01) AsV1() *EventContextV1 {
+	return ec.AsV02().AsV03().AsV1()
 }
 
 // Validate returns errors based on requirements from the CloudEvents spec.

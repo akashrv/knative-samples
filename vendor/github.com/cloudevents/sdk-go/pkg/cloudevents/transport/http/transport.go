@@ -156,18 +156,18 @@ func copyHeadersEnsure(from http.Header, to *http.Header) {
 }
 
 // Send implements Transport.Send
-func (t *Transport) Send(ctx context.Context, event cloudevents.Event) (*cloudevents.Event, error) {
+func (t *Transport) Send(ctx context.Context, event cloudevents.Event) (context.Context, *cloudevents.Event, error) {
 	ctx, r := observability.NewReporter(ctx, reportSend)
-	resp, err := t.obsSend(ctx, event)
+	rctx, resp, err := t.obsSend(ctx, event)
 	if err != nil {
 		r.Error()
 	} else {
 		r.OK()
 	}
-	return resp, err
+	return rctx, resp, err
 }
 
-func (t *Transport) obsSend(ctx context.Context, event cloudevents.Event) (*cloudevents.Event, error) {
+func (t *Transport) obsSend(ctx context.Context, event cloudevents.Event) (context.Context, *cloudevents.Event, error) {
 	if t.Client == nil {
 		t.crMu.Lock()
 		t.Client = &http.Client{}
@@ -181,6 +181,7 @@ func (t *Transport) obsSend(ctx context.Context, event cloudevents.Event) (*clou
 		req.Method = t.Req.Method
 		req.URL = t.Req.URL
 		req.Close = t.Req.Close
+		req.Host = t.Req.Host
 		copyHeadersEnsure(t.Req.Header, &req.Header)
 	}
 
@@ -190,19 +191,20 @@ func (t *Transport) obsSend(ctx context.Context, event cloudevents.Event) (*clou
 	}
 
 	if ok := t.loadCodec(ctx); !ok {
-		return nil, fmt.Errorf("unknown encoding set on transport: %d", t.Encoding)
+		return WithTransportContext(ctx, NewTransportContextFromResponse(nil)), nil, fmt.Errorf("unknown encoding set on transport: %d", t.Encoding)
 	}
 
 	msg, err := t.codec.Encode(ctx, event)
 	if err != nil {
-		return nil, err
+		return WithTransportContext(ctx, NewTransportContextFromResponse(nil)), nil, err
 	}
 
 	if m, ok := msg.(*Message); ok {
 		m.ToRequest(&req)
-		return httpDo(ctx, t.Client, &req, func(resp *http.Response, err error) (*cloudevents.Event, error) {
+		return httpDo(ctx, t.Client, &req, func(resp *http.Response, err error) (context.Context, *cloudevents.Event, error) {
+			rctx := WithTransportContext(ctx, NewTransportContextFromResponse(resp))
 			if err != nil {
-				return nil, err
+				return rctx, nil, err
 			}
 			defer resp.Body.Close()
 
@@ -213,23 +215,29 @@ func (t *Transport) obsSend(ctx context.Context, event cloudevents.Event) (*clou
 			})
 			if err != nil {
 				isErr := true
+				handled := false
 				if txerr, ok := err.(*transport.ErrTransportMessageConversion); ok {
 					if !txerr.IsFatal() {
 						isErr = false
 					}
+					if txerr.Handled() {
+						handled = true
+					}
 				}
 				if isErr {
-					return nil, err
+					return rctx, nil, err
+				}
+				if handled {
+					return rctx, nil, nil
 				}
 			}
-
 			if accepted(resp) {
-				return respEvent, nil
+				return rctx, respEvent, nil
 			}
-			return respEvent, fmt.Errorf("error sending cloudevent: %s", resp.Status)
+			return rctx, respEvent, fmt.Errorf("error sending cloudevent: %s", resp.Status)
 		})
 	}
-	return nil, fmt.Errorf("failed to encode Event into a Message")
+	return WithTransportContext(ctx, NewTransportContextFromResponse(nil)), nil, fmt.Errorf("failed to encode Event into a Message")
 }
 
 func (t *Transport) MessageToEvent(ctx context.Context, msg *Message) (*cloudevents.Event, error) {
@@ -240,13 +248,13 @@ func (t *Transport) MessageToEvent(ctx context.Context, msg *Message) (*cloudeve
 	if msg.CloudEventsVersion() != "" {
 		// This is likely a cloudevents encoded message, try to decode it.
 		if ok := t.loadCodec(ctx); !ok {
-			err = transport.NewErrTransportMessageConversion("http", fmt.Sprintf("unknown encoding set on transport: %d", t.Encoding), true)
+			err = transport.NewErrTransportMessageConversion("http", fmt.Sprintf("unknown encoding set on transport: %d", t.Encoding), false, true)
 			logger.Error("failed to load codec", zap.Error(err))
 		} else {
 			event, err = t.codec.Decode(ctx, msg)
 		}
 	} else {
-		err = transport.NewErrTransportMessageConversion("http", "cloudevents version unknown", false)
+		err = transport.NewErrTransportMessageConversion("http", "cloudevents version unknown", false, false)
 	}
 
 	// If codec returns and error, or could not load the correct codec, try
@@ -254,10 +262,17 @@ func (t *Transport) MessageToEvent(ctx context.Context, msg *Message) (*cloudeve
 	if err != nil && t.HasConverter() {
 		event, err = t.Converter.Convert(ctx, msg, err)
 	}
+
 	// If err is still set, it means that there was no converter, or the
 	// converter failed to convert.
 	if err != nil {
 		logger.Debug("failed to decode message", zap.Error(err))
+	}
+
+	// If event and error are both nil, then there is nothing to do with this event, it was handled.
+	if err == nil && event == nil {
+		logger.Debug("convert function returned (nil, nil)")
+		err = transport.NewErrTransportMessageConversion("http", "convert function handled request", true, false)
 	}
 
 	return event, err
@@ -434,23 +449,24 @@ func attachMiddleware(h http.Handler, middleware []Middleware) http.Handler {
 }
 
 type eventError struct {
+	ctx   context.Context
 	event *cloudevents.Event
 	err   error
 }
 
-func httpDo(ctx context.Context, client *http.Client, req *http.Request, fn func(*http.Response, error) (*cloudevents.Event, error)) (*cloudevents.Event, error) {
+func httpDo(ctx context.Context, client *http.Client, req *http.Request, fn func(*http.Response, error) (context.Context, *cloudevents.Event, error)) (context.Context, *cloudevents.Event, error) {
 	// Run the HTTP request in a goroutine and pass the response to fn.
 	c := make(chan eventError, 1)
 	req = req.WithContext(ctx)
 	go func() {
-		event, err := fn(client.Do(req))
-		c <- eventError{event: event, err: err}
+		rctx, event, err := fn(client.Do(req))
+		c <- eventError{ctx: rctx, event: event, err: err}
 	}()
 	select {
 	case <-ctx.Done():
-		return nil, ctx.Err()
+		return ctx, nil, ctx.Err()
 	case ee := <-c:
-		return ee.event, ee.err
+		return ee.ctx, ee.event, ee.err
 	}
 }
 
@@ -483,7 +499,7 @@ func (t *Transport) obsInvokeReceiver(ctx context.Context, event cloudevents.Eve
 
 		err := t.Receiver.Receive(ctx, event, &eventResp)
 		if err != nil {
-			logger.Warnw("got an error from receiver fn: %s", zap.Error(err))
+			logger.Warnw("got an error from receiver fn", zap.Error(err))
 			resp.StatusCode = http.StatusInternalServerError
 			return &resp, err
 		}
@@ -547,16 +563,30 @@ func (t *Transport) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	})
 	if err != nil {
 		isFatal := true
+		handled := false
 		if txerr, ok := err.(*transport.ErrTransportMessageConversion); ok {
 			isFatal = txerr.IsFatal()
+			handled = txerr.Handled()
 		}
-		if isFatal || event == nil {
+		if isFatal {
 			logger.Errorw("failed to convert http message to event", zap.Error(err))
 			w.WriteHeader(http.StatusBadRequest)
 			_, _ = w.Write([]byte(fmt.Sprintf(`{"error":%q}`, err.Error())))
 			r.Error()
 			return
 		}
+		// if handled, do not pass to receiver.
+		if handled {
+			w.WriteHeader(http.StatusNoContent)
+			r.OK()
+			return
+		}
+	}
+	if event == nil {
+		logger.Error("failed to get non-nil event from MessageToEvent")
+		w.WriteHeader(http.StatusBadRequest)
+		r.Error()
+		return
 	}
 
 	resp, err := t.invokeReceiver(ctx, *event)
@@ -575,18 +605,20 @@ func (t *Transport) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		if len(resp.Message.Header) > 0 {
 			copyHeaders(resp.Message.Header, w.Header())
 		}
+
+		status := http.StatusAccepted
+		if resp.StatusCode >= 200 && resp.StatusCode < 600 {
+			status = resp.StatusCode
+		}
 		w.Header().Add("Content-Length", strconv.Itoa(len(resp.Message.Body)))
+		w.WriteHeader(status)
+
 		if len(resp.Message.Body) > 0 {
 			if _, err := w.Write(resp.Message.Body); err != nil {
 				r.Error()
 				return
 			}
 		}
-		status := http.StatusAccepted
-		if resp.StatusCode >= 200 && resp.StatusCode < 600 {
-			status = resp.StatusCode
-		}
-		w.WriteHeader(status)
 
 		r.OK()
 		return
@@ -620,6 +652,9 @@ func (t *Transport) listen() (net.Addr, error) {
 		port := 8080
 		if t.Port != nil {
 			port = *t.Port
+			if port < 0 || port > 65535 {
+				return nil, fmt.Errorf("invalid port %d", port)
+			}
 		}
 		var err error
 		if t.listener, err = net.Listen("tcp", fmt.Sprintf(":%d", port)); err != nil {
