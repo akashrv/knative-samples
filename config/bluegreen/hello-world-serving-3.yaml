@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: hello-world
+---
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: helloworld-go
+  namespace: hello-world
+spec:
+  template:
+    metadata:
+      name: helloworld-go-rev-2
+    spec:
+      containers:
+      - image: github.com/akashrv/knative-samples/cmd/hello-world-serving
+        env:
+        - name: TARGET
+          value: "Go Sample v1 (new version)"
+  traffic:
+    - tag: previous
+      revisionName: helloworld-go-rev-1
+      percent: 50
+    - tag: current
+      revisionName: helloworld-go-rev-2
+      percent: 50
+    - tag: latest
+      latestRevision: true
+      percent: 0
