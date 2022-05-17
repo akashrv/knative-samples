@@ -61,7 +61,7 @@ kubectl label ns image-processing knative-eventing-injection=enabled
 # set the namespace as the default namespace for kubectl command
 kubectl config set-context $(kubectl config current-context) --namespace=image-processing
 ```
-2. Make sure the borker is Ready.
+2. Make sure the broker is Ready.
 ```
 kubectl get broker
 ```
